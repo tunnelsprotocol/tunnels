@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "tunnels-core",
+    "tunnels-state",
+    "tunnels-chain",
+    "tunnels-storage",
+    "tunnels-p2p",
+    "tunnels-node",
+    "tunnels-keygen",
+    "tunnels-smoke",
+    "tunnels-sdk",
+    "tunnels-wallet",
+]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Aaron E. Parsons <accounts@tunnelsprotocol.org>"]
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# Cryptography
+ed25519-dalek = { version = "2.1", default-features = false, features = ["std", "rand_core"] }
+sha2 = { version = "0.10", default-features = false, features = ["std"] }
+rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
+argon2 = { version = "0.5", default-features = false, features = ["std"] }
+aes-gcm = { version = "0.10", default-features = false, features = ["std", "aes"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+
+# 256-bit arithmetic
+uint = "0.9"
+
+# Testing
+proptest = "1.4"

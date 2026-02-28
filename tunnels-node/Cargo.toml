@@ -1,0 +1,48 @@
+[package]
+name = "tunnels-node"
+description = "Tunnels protocol node binary"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "tunnels-node"
+path = "src/main.rs"
+
+[dependencies]
+tunnels-core = { path = "../tunnels-core" }
+tunnels-storage = { path = "../tunnels-storage" }
+tunnels-state = { path = "../tunnels-state" }
+tunnels-chain = { path = "../tunnels-chain" }
+tunnels-p2p = { path = "../tunnels-p2p" }
+
+# CLI
+clap = { version = "4.0", features = ["derive"] }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full", "signal"] }
+
+# JSON-RPC
+jsonrpsee = { version = "0.24", features = ["server"] }
+
+# Serialization
+serde.workspace = true
+serde_json = "1.0"
+hex = "0.4"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Path expansion
+dirs = "5.0"
+
+[dev-dependencies]
+tokio-test = "0.4"
+reqwest = { version = "0.12", features = ["json"] }
+tempfile = "3.0"

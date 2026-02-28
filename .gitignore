@@ -1,0 +1,39 @@
+# Build artifacts
+/target/
+/dist/
+
+# Generated files
+tunnels-keygen.html
+tunnels-sdk/pkg/
+
+# Runtime data
+peers.json
+*.key
+
+# Internal documentation (not for public repo)
+/internal/
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log
+
+# Binary documents in root
+/*.docx
+/*.doc
+/*.pdf
+
+# Exception: whitepaper is tracked
+!docs/tunnels-protocol-whitepaper.pdf

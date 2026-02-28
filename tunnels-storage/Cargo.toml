@@ -1,0 +1,18 @@
+[package]
+name = "tunnels-storage"
+description = "Persistent storage with Merkle Patricia Trie commitments for the Tunnels protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+tunnels-core = { path = "../tunnels-core" }
+tunnels-state = { path = "../tunnels-state" }
+serde.workspace = true
+bincode.workspace = true
+rocksdb = "0.22"
+thiserror = "1.0"
+
+[dev-dependencies]
+tempfile = "3.10"

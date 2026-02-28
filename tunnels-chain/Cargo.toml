@@ -1,0 +1,15 @@
+[package]
+name = "tunnels-chain"
+description = "Blockchain and chain management for the Tunnels protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+tunnels-core = { path = "../tunnels-core" }
+tunnels-state = { path = "../tunnels-state" }
+serde.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

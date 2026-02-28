@@ -1,0 +1,48 @@
+[package]
+name = "tunnels-p2p"
+description = "P2P networking for the Tunnels protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+tunnels-core = { path = "../tunnels-core" }
+tunnels-chain = { path = "../tunnels-chain" }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+
+# Serialization
+serde.workspace = true
+bincode.workspace = true
+
+# Error handling
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# Collections
+lru = "0.12"
+
+# DNS resolution
+trust-dns-resolver = "0.23"
+
+# Peer persistence
+serde_json = "1.0"
+
+# Bytes for codec
+bytes = "1.0"
+
+# Futures for stream extensions
+futures = "0.3"
+
+[dev-dependencies]
+tokio-test = "0.4"
+proptest.workspace = true
+tempfile = "3.0"
+sha2 = "0.10"
+ed25519-dalek.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

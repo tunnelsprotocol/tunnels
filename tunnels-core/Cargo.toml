@@ -1,0 +1,24 @@
+[package]
+name = "tunnels-core"
+description = "Core types, cryptography, and serialization for the Tunnels protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+ed25519-dalek.workspace = true
+sha2.workspace = true
+rand.workspace = true
+serde.workspace = true
+bincode.workspace = true
+uint.workspace = true
+argon2.workspace = true
+aes-gcm.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[features]
+default = ["std"]
+std = []
