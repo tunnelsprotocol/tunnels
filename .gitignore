@@ -35,5 +35,6 @@ Thumbs.db
 /*.doc
 /*.pdf
 
-# Exception: whitepaper is tracked
+# Exceptions: tracked docs
 !docs/tunnels-protocol-whitepaper.pdf
+!docs/tunnels-keygen.html

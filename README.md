@@ -21,6 +21,7 @@ See [Running a Node](docs/running-a-node.md) for detailed instructions.
 - [Whitepaper](docs/tunnels-protocol-whitepaper.pdf)
 - [JSON-RPC API](docs/json-rpc-api.md)
 - [Running a Node](docs/running-a-node.md)
+- [Key Generator](docs/tunnels-keygen.html) — generate keys in your browser, no install required
 
 ## License
 
