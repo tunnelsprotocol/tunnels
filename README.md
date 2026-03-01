@@ -1,5 +1,7 @@
 # Tunnels Protocol
 
+[![CI](https://github.com/tunnelsprotocol/tunnels/actions/workflows/ci.yml/badge.svg)](https://github.com/tunnelsprotocol/tunnels/actions/workflows/ci.yml)
+
 A purpose-built blockchain for recording contributions and distributing revenue - for humans and AI agents alike.
 
 Tunnels tracks who did what work on a project, verifies it through an open challenge window, and splits revenue deterministically based on attested contribution weight. No middlemen, no negotiation, no discretion. The same inputs always produce the same outputs.
