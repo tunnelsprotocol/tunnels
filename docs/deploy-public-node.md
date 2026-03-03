@@ -1,8 +1,35 @@
 # Deploy a Public Tunnels Node on Google Cloud
 
-This guide walks through deploying `tunnels-node` on a Google Cloud Compute Engine VM with a public JSON-RPC endpoint and P2P connectivity.
+This guide covers deploying `tunnels-node` on a Google Cloud Compute Engine VM with a public JSON-RPC endpoint and P2P connectivity.
 
-## Create the VM
+There are two ways to deploy: run the automated script, or follow the manual steps below.
+
+## Automated deployment
+
+The script at `scripts/deploy-node.sh` does everything in one command:
+
+```bash
+bash scripts/deploy-node.sh
+```
+
+Prerequisites: `gcloud` CLI installed, authenticated (`gcloud auth login`), and a project selected (`gcloud config set project <PROJECT_ID>`).
+
+The script:
+
+1. Creates an `e2-small` VM (`tunnels-node-1`) running Ubuntu 24.04 with a 20GB SSD
+2. Opens firewall rules for P2P (TCP 9333) and JSON-RPC (TCP 9334)
+3. SSHs into the VM and installs build-essential, librocksdb-dev, pkg-config, libssl-dev, curl, git
+4. Installs Rust via rustup
+5. Clones the tunnels repo and builds with `cargo build --release`
+6. Creates a dedicated `tunnels` system user with data at `/var/lib/tunnels`
+7. Installs `tunnels-node` as a systemd service that starts on boot and restarts on failure
+8. Prints the VM's external IP with test commands
+
+Edit the variables at the top of the script to change the VM name, zone, or machine type.
+
+## Manual deployment
+
+### Create the VM
 
 In the Google Cloud Console (Compute Engine → VM instances → Create Instance):
 
@@ -10,11 +37,10 @@ In the Google Cloud Console (Compute Engine → VM instances → Create Instance
 - **Region**: pick one close to your users
 - **Machine type**: `e2-small` (2 vCPU, 2 GB RAM)
 - **Boot disk**: Ubuntu 24.04 LTS, 20 GB SSD (increase if you expect significant chain growth)
-- **Firewall**: check "Allow HTTP traffic" (not strictly required, but useful for health checks)
 
 Click Create, then SSH into the instance.
 
-## Install dependencies
+### Install dependencies
 
 ```bash
 sudo apt update && sudo apt upgrade -y
@@ -34,7 +60,7 @@ Verify:
 rustc --version   # should be 1.75 or later
 ```
 
-## Build tunnels-node
+### Build tunnels-node
 
 ```bash
 git clone https://github.com/tunnelsprotocol/tunnels.git
@@ -50,7 +76,7 @@ Copy it somewhere permanent:
 sudo cp target/release/tunnels-node /usr/local/bin/
 ```
 
-## Configure the systemd service
+### Configure the systemd service
 
 Create a dedicated user:
 
@@ -117,7 +143,7 @@ In the Google Cloud Console (VPC network → Firewall → Create Firewall Rule),
 
 - **Name**: `allow-tunnels-p2p`
 - **Direction**: Ingress
-- **Targets**: All instances (or use a network tag)
+- **Targets**: Specified target tags → `tunnels-node`
 - **Source IP ranges**: `0.0.0.0/0`
 - **Protocols and ports**: TCP `9333`
 
@@ -125,7 +151,7 @@ In the Google Cloud Console (VPC network → Firewall → Create Firewall Rule),
 
 - **Name**: `allow-tunnels-rpc`
 - **Direction**: Ingress
-- **Targets**: All instances (or use a network tag)
+- **Targets**: Specified target tags → `tunnels-node`
 - **Source IP ranges**: `0.0.0.0/0`
 - **Protocols and ports**: TCP `9334`
 
@@ -135,17 +161,19 @@ Or via `gcloud`:
 gcloud compute firewall-rules create allow-tunnels-p2p \
     --allow tcp:9333 \
     --source-ranges 0.0.0.0/0 \
+    --target-tags tunnels-node \
     --description "Tunnels P2P port"
 
 gcloud compute firewall-rules create allow-tunnels-rpc \
     --allow tcp:9334 \
     --source-ranges 0.0.0.0/0 \
+    --target-tags tunnels-node \
     --description "Tunnels JSON-RPC API"
 ```
 
 ## Point a subdomain at the VM
 
-1. Get the VM's external IP from the Compute Engine console (or use a static IP via VPC network → External IP addresses → Reserve).
+1. Get the VM's external IP from the Compute Engine console (or reserve a static IP via VPC network → External IP addresses).
 
 2. In your DNS provider, add an A record:
 
