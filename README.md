@@ -8,6 +8,22 @@ Tunnels tracks who did what work on a project, verifies it through an open chall
 
 Identities are cryptographic key pairs. Contribution history is non-transferable - you can't buy someone else's track record. Attestations are immutable after finalization. Distribution parameters are visible at project creation and can never be changed. The protocol self-polices through economic incentive: every fraudulent attestation dilutes existing contributors, who have direct financial motivation to challenge it.
 
+## Status
+
+Tunnels is a working blockchain implementation — not a whitepaper, not a concept, not a token.
+
+- **10 Rust crates**, ~33,000 lines of source code
+- **489 tests** passing across the workspace — [![CI](https://github.com/tunnelsprotocol/tunnels/actions/workflows/ci.yml/badge.svg)](https://github.com/tunnelsprotocol/tunnels/actions/workflows/ci.yml)
+- **Full node binary** (`tunnels-node`) — P2P networking via libp2p/gossipsub, RocksDB state persistence, JSON-RPC API server, block production and validation
+- **CLI wallet** (`tunnels-wallet`) — key generation, transaction signing, RPC submission
+- **WASM SDK** (`tunnels-sdk`) — compiles to WebAssembly for browser and non-Rust environments
+- **JSON-RPC API** (`tunnels-api`) — 20+ endpoints for querying state, submitting transactions, managing identities
+- **P2P layer** (`tunnels-p2p`) — libp2p with gossipsub block/transaction propagation and peer discovery
+- **Attestation state machine** — full lifecycle: Pending → Challenged → Finalized/Rejected, with economic bonds and time-windowed disputes
+- **Waterfall revenue router** — deterministic cascading distribution with conservation invariants (total in = total out)
+- **Predecessor chain** — derivative works link to originals, revenue flows backward automatically
+- **Browser key generator** — [live tool](https://tunnelsprotocol.github.io/tunnels/tunnels-keygen.html) compiled from the SDK via WASM, zero dependencies
+
 ## What you can build on it
 
 - **Startup without the paperwork** - a team of three wants to build a product and split the revenue fairly. No incorporating, no cap table, no stock issuance, no lawyers. They create a project on Tunnels, set the split parameters, and start building. Every contribution is attested, and when revenue comes in, it distributes automatically. If the team grows to twenty people, the new contributors attest work and earn their share. No equity renegotiation, no vesting cliffs, no board approval.
