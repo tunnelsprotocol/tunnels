@@ -1,0 +1,28 @@
+# Tunnels Protocol
+
+## What it is
+A purpose-built blockchain for recording contributions and distributing revenue deterministically. Not an EVM chain. Not a token. Infrastructure for tracking who did work and ensuring they get paid.
+
+## Architecture
+10 Rust crates, ~33,000 lines of code, 489 tests passing.
+Full node binary (tunnels-node), CLI wallet (tunnels-wallet), WASM-compatible SDK (tunnels-sdk).
+P2P networking via libp2p/gossipsub. State persistence via RocksDB. JSON-RPC API with 20+ endpoints.
+
+## Core primitives
+- Identity: non-transferable Ed25519 key pairs (Human or Agent type)
+- Project: immutable container with distribution parameters set at creation
+- Attestation: signed contribution record with economic bond, subject to challenge window
+- Verification: time-windowed challenge period, binary outcome (finalized or rejected)
+- Revenue Router: deterministic waterfall distribution with cascading remainders
+
+## Key design decisions
+- Single-key architecture: one key signs everything, prevents capital capture of reputation
+- Append-only attestations: contribution history cannot be rewritten
+- Deterministic distribution: same inputs always produce same outputs, no discretion
+- Transparent parameters: all project economics visible at creation, immutable after
+- Mandatory challenge windows: every attestation can be disputed before finalization
+
+## Links
+- GitHub: https://github.com/tunnelsprotocol/tunnels
+- Whitepaper: https://tunnelsprotocol.org/tunnels-protocol-whitepaper.pdf
+- Key Generator: https://tunnelsprotocol.github.io/tunnels/tunnels-keygen.html

@@ -44,6 +44,29 @@ cargo build --release
 
 See [Running a Node](docs/running-a-node.md) for detailed instructions.
 
+## Architecture
+
+10 Rust crates, ~33,000 lines of code, 489 tests passing.
+
+| Crate | Purpose |
+|-------|---------|
+| `tunnels-core` | Core types, Ed25519 cryptography, transaction definitions, serialization |
+| `tunnels-state` | State machine, attestation execution, waterfall revenue router, accumulator math |
+| `tunnels-chain` | Blockchain management, block production, mempool, fork handling |
+| `tunnels-storage` | RocksDB persistence with Merkle Patricia Trie state commitments |
+| `tunnels-p2p` | Peer-to-peer networking via libp2p/gossipsub, peer discovery, block sync |
+| `tunnels-node` | Full node binary — ties everything together, exposes JSON-RPC API |
+| `tunnels-sdk` | SDK for key management and transaction signing, compiles to WASM for browser and non-Rust environments |
+| `tunnels-wallet` | Command-line wallet for identity management, attestations, and revenue claims |
+| `tunnels-keygen` | Standalone key generation tool (also available as browser WASM) |
+| `tunnels-smoke` | End-to-end smoke tests against a running node |
+
+`tunnels-node` starts a full node that initializes RocksDB state persistence, connects to the P2P network via libp2p/gossipsub, exposes a JSON-RPC API with 20+ endpoints, and produces/validates blocks.
+
+`tunnels-sdk` compiles to WASM for browser and non-Rust environments, enabling key generation and transaction signing without a local Rust toolchain.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full technical overview.
+
 ## Documentation
 
 - [Whitepaper](docs/tunnels-protocol-whitepaper.pdf)
