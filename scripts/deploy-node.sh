@@ -102,7 +102,7 @@ set -euo pipefail
 # --- Install system packages ---
 echo "[remote] Installing system packages..."
 sudo apt-get update -qq
-sudo apt-get install -y -qq build-essential librocksdb-dev pkg-config libssl-dev curl git
+sudo apt-get install -y -qq build-essential librocksdb-dev pkg-config libssl-dev clang libclang-dev curl git
 
 # --- Install Rust via rustup ---
 echo "[remote] Installing Rust..."

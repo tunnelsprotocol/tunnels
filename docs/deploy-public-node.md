@@ -44,7 +44,7 @@ Click Create, then SSH into the instance.
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y build-essential librocksdb-dev pkg-config libssl-dev curl git
+sudo apt install -y build-essential librocksdb-dev pkg-config libssl-dev clang libclang-dev curl git
 ```
 
 Install Rust:
