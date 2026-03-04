@@ -91,6 +91,10 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full technical overview.
 - [Running a Node](docs/running-a-node.md)
 - [Key Generator](https://tunnelsprotocol.github.io/tunnels/tunnels-keygen.html) - generate keys in your browser, no install required
 
+## Relationship between whitepaper and codebase
+
+The whitepaper describes the protocol design, invariants, and incentive analysis. The implementation lives in this repository. Data structures are in tunnels-core, the API specification is in docs/json-rpc-api.md, the state machine is in tunnels-state, and a working application (browser key generator) is built on tunnels-sdk. The whitepaper is not a technical spec — the code is.
+
 ## License
 
 Licensed under either of Apache License, Version 2.0 or MIT license at your option.
