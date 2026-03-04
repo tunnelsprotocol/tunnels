@@ -250,7 +250,13 @@ pub async fn start_rpc_server(
     state: Arc<RpcState>,
     _shutdown_tx: ShutdownTx,
 ) -> anyhow::Result<RpcServerHandle> {
-    let server = ServerBuilder::default().build(addr).await?;
+    let cors = tower_http::cors::CorsLayer::permissive();
+    let middleware = tower::ServiceBuilder::new().layer(cors);
+
+    let server = ServerBuilder::default()
+        .set_http_middleware(middleware)
+        .build(addr)
+        .await?;
     let local_addr = server.local_addr()?;
 
     let module = build_rpc_module(state);
