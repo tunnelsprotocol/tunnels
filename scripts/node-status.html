@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunnels Node Status</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: #000;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        .header h1 {
+            color: #fff;
+            font-size: 1.6rem;
+            margin-bottom: 0.5rem;
+        }
+        .header p {
+            color: #888;
+            font-size: 0.95rem;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .status-indicator.connected { background: #4caf50; box-shadow: 0 0 6px #4caf50; }
+        .status-indicator.disconnected { background: #f44336; box-shadow: 0 0 6px #f44336; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            max-width: 900px;
+            margin: 0 auto 3rem;
+        }
+        .card {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+        .card .label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+        .card .value {
+            font-family: 'SF Mono', 'Fira Code', Menlo, Consolas, monospace;
+            font-size: 1.4rem;
+            color: #fff;
+            word-break: break-all;
+        }
+        .card .value.hash {
+            font-size: 0.85rem;
+            color: #ccc;
+        }
+        .card .value.error {
+            color: #f44336;
+            font-size: 1rem;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #222;
+        }
+        .footer a {
+            color: #888;
+            text-decoration: none;
+            margin: 0 1rem;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+        .footer a:hover { color: #fff; }
+        .updated {
+            text-align: center;
+            color: #444;
+            font-size: 0.8rem;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><span class="status-indicator disconnected" id="indicator"></span>Tunnels Node</h1>
+        <p id="status-text">Connecting...</p>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="label">Block Height</div>
+            <div class="value" id="block-height">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Best Block Hash</div>
+            <div class="value hash" id="best-hash">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Connected Peers</div>
+            <div class="value" id="peer-count">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Mempool Transactions</div>
+            <div class="value" id="mempool-size">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Node Version</div>
+            <div class="value" id="node-version">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Network</div>
+            <div class="value" id="network">--</div>
+        </div>
+    </div>
+
+    <p class="updated" id="updated"></p>
+
+    <div class="footer">
+        <a href="https://tunnelsprotocol.org">tunnelsprotocol.org</a>
+        <a href="https://github.com/tunnelsprotocol/tunnels">GitHub</a>
+        <a href="https://tunnelsprotocol.org/tunnels-protocol-whitepaper.pdf">Whitepaper</a>
+    </div>
+
+    <script>
+        const RPC = '/rpc';
+
+        async function rpc(method, params) {
+            const res = await fetch(RPC, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jsonrpc: '2.0', method, params: params || [], id: 1 })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.message);
+            return data.result;
+        }
+
+        function setText(id, text) {
+            document.getElementById(id).textContent = text;
+        }
+
+        function setConnected(ok) {
+            const el = document.getElementById('indicator');
+            el.className = 'status-indicator ' + (ok ? 'connected' : 'disconnected');
+            setText('status-text', ok ? 'Connected' : 'Connection lost');
+        }
+
+        async function refresh() {
+            try {
+                const [blockCount, bestHash, nodeInfo, mempoolInfo] = await Promise.all([
+                    rpc('getBlockCount'),
+                    rpc('getBestBlockHash'),
+                    rpc('getNodeInfo'),
+                    rpc('getMempoolInfo')
+                ]);
+
+                setText('block-height', blockCount.toLocaleString());
+                setText('best-hash', bestHash || '(genesis)');
+                setText('peer-count', nodeInfo.peer_count != null ? nodeInfo.peer_count : '--');
+                setText('node-version', nodeInfo.version || '--');
+                setText('network', nodeInfo.network || 'testnet');
+                setText('mempool-size', mempoolInfo.size != null ? mempoolInfo.size : '--');
+                setText('updated', 'Last updated: ' + new Date().toLocaleTimeString());
+                setConnected(true);
+            } catch (e) {
+                setConnected(false);
+                setText('updated', 'Error: ' + e.message);
+            }
+        }
+
+        refresh();
+        setInterval(refresh, 5000);
+    </script>
+</body>
+</html>

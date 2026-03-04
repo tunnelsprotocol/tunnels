@@ -58,7 +58,14 @@ echo "==> VM created."
 # the rule already exists.
 # --------------------------------------------------------------------------
 
-echo "==> Opening firewall: TCP ${P2P_PORT} (P2P), TCP ${RPC_PORT} (JSON-RPC)"
+echo "==> Opening firewall: TCP 80 (HTTP), TCP ${P2P_PORT} (P2P), TCP ${RPC_PORT} (JSON-RPC)"
+
+gcloud compute firewall-rules create allow-tunnels-http \
+    --allow="tcp:80" \
+    --source-ranges="0.0.0.0/0" \
+    --target-tags="${NETWORK_TAG}" \
+    --description="Tunnels node status page (HTTP)" \
+    2>/dev/null || echo "    Firewall rule allow-tunnels-http already exists, skipping."
 
 gcloud compute firewall-rules create allow-tunnels-p2p \
     --allow="tcp:${P2P_PORT}" \
@@ -167,10 +174,56 @@ sudo systemctl start tunnels-node
 
 echo "[remote] tunnels-node is running."
 sudo systemctl status tunnels-node --no-pager
+
+# --- Set up nginx as a reverse proxy + status page ---
+echo "[remote] Setting up nginx..."
+sudo apt-get install -y -qq nginx
+
+sudo tee /etc/nginx/sites-available/tunnels > /dev/null << 'NGINX'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    root /var/www/tunnels;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /rpc {
+        proxy_pass http://127.0.0.1:9334/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Content-Type "application/json";
+    }
+}
+NGINX
+
+sudo mkdir -p /var/www/tunnels
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo ln -sf /etc/nginx/sites-available/tunnels /etc/nginx/sites-enabled/tunnels
+sudo nginx -t
+sudo systemctl enable nginx
+sudo systemctl restart nginx
+echo "[remote] nginx is running."
 REMOTE_SCRIPT
 
 # --------------------------------------------------------------------------
-# Step 5: Print the VM's external IP
+# Step 5: Copy the status page to the VM
+# --------------------------------------------------------------------------
+
+echo "==> Uploading status page..."
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+gcloud compute scp "${SCRIPT_DIR}/node-status.html" "${VM_NAME}:/tmp/node-status.html" --zone="${ZONE}"
+gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --command="sudo cp /tmp/node-status.html /var/www/tunnels/index.html"
+
+echo "==> Status page deployed."
+
+# --------------------------------------------------------------------------
+# Step 6: Print the VM's external IP
 # --------------------------------------------------------------------------
 
 echo ""
@@ -187,13 +240,9 @@ echo "  VM:       ${VM_NAME}"
 echo "  Zone:     ${ZONE}"
 echo "  IP:       ${EXTERNAL_IP}"
 echo ""
+echo "  Status:   http://${EXTERNAL_IP}"
 echo "  P2P:      ${EXTERNAL_IP}:${P2P_PORT}"
 echo "  RPC:      ${EXTERNAL_IP}:${RPC_PORT}"
-echo ""
-echo "  Test with:"
-echo "    curl -s -X POST http://${EXTERNAL_IP}:${RPC_PORT} \\"
-echo "      -H 'Content-Type: application/json' \\"
-echo "      -d '{\"jsonrpc\":\"2.0\",\"method\":\"getBlockCount\",\"params\":[],\"id\":1}'"
 echo ""
 echo "  Point a subdomain at this IP:"
 echo "    A record: node1.tunnelsprotocol.org -> ${EXTERNAL_IP}"
