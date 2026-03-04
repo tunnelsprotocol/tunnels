@@ -199,7 +199,7 @@ From any machine, test the JSON-RPC endpoint:
 ```bash
 curl -s -X POST http://node1.tunnelsprotocol.org:9334 \
     -H "Content-Type: application/json" \
-    -d '{"jsonrpc":"2.0","method":"chain_getBlockHeight","params":[],"id":1}'
+    -d '{"jsonrpc":"2.0","method":"getBlockCount","params":[],"id":1}'
 ```
 
 You should get a JSON response with the current block height.

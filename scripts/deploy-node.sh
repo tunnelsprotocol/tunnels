@@ -123,8 +123,9 @@ cd "$HOME/tunnels"
 git pull --ff-only
 cargo build --release
 
-# --- Install the binary ---
+# --- Install the binary (stop service first if running to avoid "Text file busy") ---
 echo "[remote] Installing binary to /usr/local/bin..."
+sudo systemctl stop tunnels-node 2>/dev/null || true
 sudo cp target/release/tunnels-node /usr/local/bin/
 
 # --- Create a dedicated system user ---
@@ -192,7 +193,7 @@ echo ""
 echo "  Test with:"
 echo "    curl -s -X POST http://${EXTERNAL_IP}:${RPC_PORT} \\"
 echo "      -H 'Content-Type: application/json' \\"
-echo "      -d '{\"jsonrpc\":\"2.0\",\"method\":\"chain_getBlockHeight\",\"params\":[],\"id\":1}'"
+echo "      -d '{\"jsonrpc\":\"2.0\",\"method\":\"getBlockCount\",\"params\":[],\"id\":1}'"
 echo ""
 echo "  Point a subdomain at this IP:"
 echo "    A record: node1.tunnelsprotocol.org -> ${EXTERNAL_IP}"
