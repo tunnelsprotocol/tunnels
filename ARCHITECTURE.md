@@ -149,3 +149,17 @@ The 13 transaction types: CreateIdentity, CreateAgent, UpdateProfileHash, Deacti
 ## P2P Networking
 
 `tunnels-p2p` handles peer discovery, connection management, and data propagation using libp2p. Block and transaction gossip uses the gossipsub protocol. The sync module handles initial block download and catching up after disconnection. An LRU peer cache and DNS-based discovery help maintain network connectivity.
+
+## Public Testnet
+
+A public testnet node is running at [node1.tunnelsprotocol.org](http://node1.tunnelsprotocol.org) with a browser-accessible status page showing block height, peer count, mempool, and network info.
+
+- **Status page**: http://node1.tunnelsprotocol.org (port 80)
+- **JSON-RPC endpoint**: node1.tunnelsprotocol.org:9334
+- **P2P endpoint**: node1.tunnelsprotocol.org:9333
+
+Connect another node to the testnet:
+
+```bash
+tunnels-node --seed-nodes node1.tunnelsprotocol.org:9333
+```

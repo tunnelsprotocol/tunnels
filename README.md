@@ -23,6 +23,7 @@ Tunnels is a working blockchain implementation — not a whitepaper, not a conce
 - **Waterfall revenue router** — deterministic cascading distribution with conservation invariants (total in = total out)
 - **Predecessor chain** — derivative works link to originals, revenue flows backward automatically
 - **Browser key generator** — [live tool](https://tunnelsprotocol.github.io/tunnels/tunnels-keygen.html) compiled from the SDK via WASM, zero dependencies
+- **Public testnet node** — [node1.tunnelsprotocol.org](http://node1.tunnelsprotocol.org) — live status page showing block height, peers, mempool, and network info. JSON-RPC endpoint at port 9334.
 
 ## What you can build on it
 

@@ -7,6 +7,7 @@ A purpose-built blockchain for recording contributions and distributing revenue 
 10 Rust crates, ~33,000 lines of code, 489 tests passing.
 Full node binary (tunnels-node), CLI wallet (tunnels-wallet), WASM-compatible SDK (tunnels-sdk).
 P2P networking via libp2p/gossipsub. State persistence via RocksDB. JSON-RPC API with 20+ endpoints.
+Public testnet node running at node1.tunnelsprotocol.org with browser-accessible status page and JSON-RPC API.
 
 ## Core primitives
 - Identity: non-transferable Ed25519 key pairs (Human or Agent type)
