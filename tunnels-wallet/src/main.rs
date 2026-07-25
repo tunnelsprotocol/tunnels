@@ -154,6 +154,22 @@ enum Commands {
         denom: String,
     },
 
+    /// Finalize a pending attestation whose verification window has expired.
+    /// Permissionless: any identity may finalize.
+    FinalizeAttestation {
+        /// Node RPC URL.
+        #[arg(long, required = true)]
+        node: String,
+
+        /// Name of the key to use (default: default.key).
+        #[arg(long)]
+        name: Option<String>,
+
+        /// Attestation ID (hex).
+        #[arg(long, required = true)]
+        attestation: String,
+    },
+
     /// Register a new project.
     RegisterProject {
         /// Node RPC URL.
@@ -283,6 +299,11 @@ fn run() -> Result<(), String> {
             bond,
             denom,
         } => cmd_submit_attestation(&keystore, &node, name, &project, units, &evidence, bond, &denom),
+        Commands::FinalizeAttestation {
+            node,
+            name,
+            attestation,
+        } => cmd_finalize_attestation(&keystore, &node, name, &attestation),
         Commands::RegisterProject {
             node,
             name,
@@ -504,8 +525,8 @@ fn submit_transaction(node: &str, signed_tx: &SignedTransaction) -> Result<Strin
 
     let body = serde_json::json!({
         "jsonrpc": "2.0",
-        "method": "submit_transaction",
-        "params": { "signed_tx": tx_hex },
+        "method": "submitTransaction",
+        "params": [tx_hex],
         "id": 1
     });
 
@@ -526,9 +547,8 @@ fn submit_transaction(node: &str, signed_tx: &SignedTransaction) -> Result<Strin
         .get("result")
         .ok_or("Missing result in response")?;
     let tx_hash = result
-        .get("tx_hash")
-        .and_then(|v: &serde_json::Value| v.as_str())
-        .ok_or("Missing tx_hash in result")?;
+        .as_str()
+        .ok_or("Missing transaction id in result")?;
 
     Ok(tx_hash.to_string())
 }
@@ -536,8 +556,8 @@ fn submit_transaction(node: &str, signed_tx: &SignedTransaction) -> Result<Strin
 fn get_tx_difficulty(node: &str) -> Result<u64, String> {
     let body = serde_json::json!({
         "jsonrpc": "2.0",
-        "method": "get_chain_info",
-        "params": {},
+        "method": "getMiningInfo",
+        "params": [],
         "id": 1
     });
 
@@ -627,6 +647,25 @@ fn cmd_create_agent(
     println!("Transaction submitted: {}", tx_hash);
     println!("Agent created successfully!");
 
+    Ok(())
+}
+
+fn cmd_finalize_attestation(
+    keystore: &Path,
+    node: &str,
+    name: Option<String>,
+    attestation_hex: &str,
+) -> Result<(), String> {
+    let kp = load_keypair(keystore, name)?;
+    let attestation_id: [u8; 20] = hex_to_bytes(attestation_hex)?;
+
+    println!("Finalizing attestation {}...", hex::encode(attestation_id));
+
+    let tx = Transaction::FinalizeAttestation { attestation_id };
+
+    let tx_hash = sign_and_submit(node, &kp, &tx)?;
+    println!("Transaction submitted: {}", tx_hash);
+    println!("Attestation finalized (pending confirmation).");
     Ok(())
 }
 

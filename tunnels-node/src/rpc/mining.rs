@@ -95,12 +95,18 @@ pub fn register_methods(module: &mut RpcModule<Arc<RpcState>>) {
             let chain = state.chain.read().await;
             let height = chain.height();
             let difficulty = tunnels_chain::calculate_next_difficulty(&chain, height + 1);
+            let mut tip_state = chain.state().clone();
+            let tx_difficulty = {
+                use tunnels_state::StateReader;
+                tip_state.get_tx_difficulty_state().current_tx_difficulty
+            };
             let is_devnet = state.devnet.is_some();
 
             #[derive(Clone, Serialize)]
             struct MiningInfo {
                 height: u64,
                 difficulty: u64,
+                tx_difficulty: u64,
                 devnet: bool,
                 mining_enabled: bool,
             }
@@ -108,6 +114,7 @@ pub fn register_methods(module: &mut RpcModule<Arc<RpcState>>) {
             Ok::<_, ErrorObjectOwned>(MiningInfo {
                 height,
                 difficulty,
+                tx_difficulty,
                 devnet: is_devnet,
                 mining_enabled: state.mine_tx.is_some(),
             })

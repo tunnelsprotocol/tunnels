@@ -424,7 +424,8 @@ Returns mining status information.
 | Field | Type | Description |
 |-------|------|-------------|
 | height | number | Current height |
-| difficulty | number | Current difficulty |
+| difficulty | number | Current block difficulty |
+| tx_difficulty | number | Current per-transaction PoW difficulty |
 | devnet | boolean | Whether devnet mode is enabled |
 | mining_enabled | boolean | Whether mining is enabled |
 
@@ -865,11 +866,11 @@ ADDRESS=$(echo $KEYPAIR | jq -r .address)
 echo "Public Key: $PUBLIC_KEY"
 echo "Address: $ADDRESS"
 
-# Note: In a real application, you would:
-# 1. Build the transaction using the Tunnels SDK
-# 2. Sign it with the private key
-# 3. Mine the PoW
-# 4. Serialize and submit
+# Note: In a real application, you would build, sign, and PoW-mine the
+# transaction with the Tunnels SDK (natively, or in the browser via the WASM
+# build's WasmKeyHandle.buildCreateIdentity / buildSubmitAttestation /
+# buildFinalizeAttestation, which return submit-ready hex), then submit the
+# hex via submitTransaction.
 
 # For devnet testing, transactions can be submitted directly
 # using the SDK or by constructing the hex manually

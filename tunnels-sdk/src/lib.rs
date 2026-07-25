@@ -115,6 +115,11 @@ pub fn get_address(keypair: &KeyPair) -> [u8; 20] {
 #[cfg(target_arch = "wasm32")]
 mod wasm {
     use super::*;
+    use tunnels_core::{
+        serialization::serialize,
+        transaction::{mine_pow, Transaction},
+        SignedTransaction, U256,
+    };
     use wasm_bindgen::prelude::*;
     use std::cell::RefCell;
     use std::collections::HashMap;
@@ -194,6 +199,123 @@ mod wasm {
                 kps.borrow_mut().remove(&self.id);
             });
         }
+
+        /// Build, sign, and PoW-mine a CreateIdentity transaction.
+        /// Returns the hex-encoded SignedTransaction ready for submitTransaction.
+        #[wasm_bindgen(js_name = buildCreateIdentity)]
+        pub fn build_create_identity(&self, difficulty: u64) -> Result<String, JsValue> {
+            self.with_keypair(|kp| {
+                let tx = Transaction::CreateIdentity {
+                    public_key: kp.public_key(),
+                };
+                build_signed_tx(kp, tx, difficulty)
+            })
+        }
+
+        /// Build, sign, and PoW-mine a SubmitAttestation transaction.
+        /// bond_poster may be the contributor or a third party (hex address).
+        #[wasm_bindgen(js_name = buildSubmitAttestation)]
+        #[allow(clippy::too_many_arguments)]
+        pub fn build_submit_attestation(
+            &self,
+            project_id_hex: &str,
+            units: u64,
+            evidence_hex: &str,
+            bond_poster_hex: &str,
+            bond_amount: u64,
+            denomination: &str,
+            difficulty: u64,
+        ) -> Result<String, JsValue> {
+            let project_id = hex_to_arr20(project_id_hex)?;
+            let evidence_hash = hex_to_arr32(evidence_hex)?;
+            let bond_poster = hex_to_arr20(bond_poster_hex)?;
+            let denom_bytes = denomination.as_bytes();
+            if denom_bytes.len() > 8 {
+                return Err(JsValue::from_str("denomination must be 8 bytes or less"));
+            }
+            let mut denom = [0u8; 8];
+            denom[..denom_bytes.len()].copy_from_slice(denom_bytes);
+
+            self.with_keypair(|kp| {
+                let tx = Transaction::SubmitAttestation {
+                    project_id,
+                    units,
+                    evidence_hash,
+                    bond_poster,
+                    bond_amount: U256::from(bond_amount),
+                    bond_denomination: denom,
+                };
+                build_signed_tx(kp, tx, difficulty)
+            })
+        }
+
+        /// Build, sign, and PoW-mine a FinalizeAttestation transaction.
+        /// Permissionless: any identity may finalize an expired attestation.
+        #[wasm_bindgen(js_name = buildFinalizeAttestation)]
+        pub fn build_finalize_attestation(
+            &self,
+            attestation_id_hex: &str,
+            difficulty: u64,
+        ) -> Result<String, JsValue> {
+            let attestation_id = hex_to_arr20(attestation_id_hex)?;
+            self.with_keypair(|kp| {
+                let tx = Transaction::FinalizeAttestation { attestation_id };
+                build_signed_tx(kp, tx, difficulty)
+            })
+        }
+    }
+
+    impl WasmKeyHandle {
+        fn with_keypair<T>(
+            &self,
+            f: impl FnOnce(&KeyPair) -> Result<T, JsValue>,
+        ) -> Result<T, JsValue> {
+            KEYPAIRS.with(|kps| {
+                let kps = kps.borrow();
+                let kp = kps
+                    .get(&self.id)
+                    .ok_or_else(|| JsValue::from_str("invalid key handle"))?;
+                f(kp)
+            })
+        }
+    }
+
+    /// Serialize + sign + PoW-mine a transaction into a submittable hex string.
+    fn build_signed_tx(kp: &KeyPair, tx: Transaction, difficulty: u64) -> Result<String, JsValue> {
+        let tx_bytes = serialize(&tx)
+            .map_err(|e| JsValue::from_str(&format!("serialization failed: {}", e)))?;
+        let signature = sign(kp.signing_key(), &tx_bytes);
+        let (pow_nonce, pow_hash) = mine_pow(&tx, &kp.public_key(), &signature, difficulty);
+        let signed = SignedTransaction {
+            tx,
+            signer: kp.public_key(),
+            signature,
+            pow_nonce,
+            pow_hash,
+        };
+        let signed_bytes = serialize(&signed)
+            .map_err(|e| JsValue::from_str(&format!("serialization failed: {}", e)))?;
+        Ok(hex_encode(&signed_bytes))
+    }
+
+    fn hex_to_arr20(s: &str) -> Result<[u8; 20], JsValue> {
+        let bytes = hex_decode(s).map_err(|_| JsValue::from_str("invalid hex"))?;
+        if bytes.len() != 20 {
+            return Err(JsValue::from_str("expected 20-byte hex value"));
+        }
+        let mut arr = [0u8; 20];
+        arr.copy_from_slice(&bytes);
+        Ok(arr)
+    }
+
+    fn hex_to_arr32(s: &str) -> Result<[u8; 32], JsValue> {
+        let bytes = hex_decode(s).map_err(|_| JsValue::from_str("invalid hex"))?;
+        if bytes.len() != 32 {
+            return Err(JsValue::from_str("expected 32-byte hex value"));
+        }
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&bytes);
+        Ok(arr)
     }
 
     impl Drop for WasmKeyHandle {
