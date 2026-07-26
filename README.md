@@ -8,6 +8,17 @@ Tunnels tracks who did what work on a project, verifies it through an open chall
 
 Identities are cryptographic key pairs. Contribution history is non-transferable - you can't buy someone else's track record. Attestations are immutable after finalization. Distribution parameters are visible at project creation and can never be changed. The protocol self-polices through economic incentive: every fraudulent attestation dilutes existing contributors, who have direct financial motivation to challenge it.
 
+## Start here
+
+Building on or contributing to Tunnels? Read these first — they are binding:
+
+- [Implementation Rules](docs/implementation-rules.md) — the 15 constraints every change must satisfy
+- [Deliberately Absent](docs/deliberately-absent.md) — missing-looking features that are decisions; do not add them
+- [Security Model](SECURITY.md) — what secures a chain with no mining rewards
+- [Building an Application](docs/building-an-application.md) — the ten things your app must model
+
+**AI assistants:** load [docs/llms.txt](docs/llms.txt) before writing any code.
+
 ## Status
 
 Tunnels is a working blockchain implementation — not a whitepaper, not a concept, not a token.

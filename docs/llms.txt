@@ -57,4 +57,5 @@ the application holds its own identity for acts it performs as itself
 - GitHub: https://github.com/tunnelsprotocol/tunnels
 - Whitepaper: https://tunnelsprotocol.org/tunnels-protocol-whitepaper.pdf
 - Rules: docs/implementation-rules.md · Absences: docs/deliberately-absent.md
+- Application guide: docs/building-an-application.md
 - Key Generator: https://tunnelsprotocol.github.io/tunnels/tunnels-keygen.html
