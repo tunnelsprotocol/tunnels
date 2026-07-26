@@ -1,29 +1,60 @@
-# Tunnels Protocol
+# Tunnels Protocol — guidance for AI assistants and agents
+
+You are likely an AI helping a developer build on or contribute to Tunnels.
+Read this entire file before writing code. Tunnels is small, deliberate, and
+permanent — most damage comes from "completing" things that are intentionally
+absent.
 
 ## What it is
-A purpose-built blockchain for recording contributions and distributing revenue deterministically. Not an EVM chain. Not a token. Infrastructure for tracking who did work and ensuring they get paid.
+A purpose-built blockchain for recording contributions and distributing revenue
+deterministically. Not an EVM chain. No token. Live network: mainnet at
+node1.tunnelsprotocol.org (JSON-RPC :9334). 10 Rust crates, WASM SDK, CLI
+wallet, full node.
 
-## Architecture
-10 Rust crates, ~33,000 lines of code, 489 tests passing.
-Full node binary (tunnels-node), CLI wallet (tunnels-wallet), WASM-compatible SDK (tunnels-sdk).
-P2P networking via libp2p/gossipsub. State persistence via RocksDB. JSON-RPC API with 20+ endpoints.
-Public testnet node running at node1.tunnelsprotocol.org with browser-accessible status page and JSON-RPC API.
+## Hard constraints — never violate, never "fix"
+1. NO native token, block rewards, or protocol fees. Ever. (Rules 4, 14.)
+2. NO continuous mining. Block production is event-driven: transaction
+   acceptance triggers the block. Empty blocks are never produced.
+3. NO key rotation, recovery, or delegated signing. Loss is permanent by design.
+4. NO admin keys, governance, or upgrade paths. Evolution = new deployment.
+5. Contributors never pay anything. Bonds come from applications, returned on
+   finalization.
+6. Verification windows: 24h protocol minimum. Longer allowed, shorter never.
+7. On-chain data is hashes and protocol state only. No names, no content.
+If a task seems to require violating these, the task is wrong, not the rules.
+See docs/implementation-rules.md and docs/deliberately-absent.md — they are
+constraints with the force of consensus rules.
+
+## Behaviors that will surprise you
+- Transactions are deterministic (Ed25519): identical fields + same key =
+  identical tx id. Distinguish otherwise-identical registrations via
+  evidence_hash, or they collide.
+- Project ids and attestation ids are the first 20 bytes of the signed tx id.
+- RPC naming is split: chain/mempool/mining/network methods are camelCase
+  (getBlockCount, submitTransaction); protocol-state methods are snake_case
+  (get_identity, get_project). Params are positional arrays.
+- Timestamps come from consensus. Nothing can be backdated.
+- The wallet accepts TUNNELS_WALLET_PASSWORD for non-interactive use;
+  `import --yes` skips prompts.
 
 ## Core primitives
-- Identity: non-transferable Ed25519 key pairs (Human or Agent type)
-- Project: immutable container with distribution parameters set at creation
-- Attestation: signed contribution record with economic bond, subject to challenge window
-- Verification: time-windowed challenge period, binary outcome (finalized or rejected)
-- Revenue Router: deterministic waterfall distribution with cascading remainders
+- Identity: non-transferable Ed25519 key pair (Human or Agent; Agent revenue
+  routes to its parent Human)
+- Project: immutable container — ρ reserve, φ fee, γ genesis, δ predecessor,
+  window, bonds — all locked at registration
+- Attestation: contributor-signed contribution record, bonded, subject to a
+  challenge window; finalization is permissionless
+- Revenue Router: deterministic waterfall (predecessor → reserve → fee →
+  genesis → labor pool pro-rata by units)
 
-## Key design decisions
-- Single-key architecture: one key signs everything, prevents capital capture of reputation
-- Append-only attestations: contribution history cannot be rewritten
-- Deterministic distribution: same inputs always produce same outputs, no discretion
-- Transparent parameters: all project economics visible at creation, immutable after
-- Mandatory challenge windows: every attestation can be disputed before finalization
+## Integration pattern (the only sanctioned shape)
+Applications embed the WASM SDK; contributors' keys are generated and sign in
+their own browsers; the application server stores addresses only, never keys;
+the application holds its own identity for acts it performs as itself
+(deposits, finalization, adjudication); settlement is application-layer.
 
 ## Links
 - GitHub: https://github.com/tunnelsprotocol/tunnels
 - Whitepaper: https://tunnelsprotocol.org/tunnels-protocol-whitepaper.pdf
+- Rules: docs/implementation-rules.md · Absences: docs/deliberately-absent.md
 - Key Generator: https://tunnelsprotocol.github.io/tunnels/tunnels-keygen.html
