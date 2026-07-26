@@ -119,6 +119,9 @@ impl Node {
             (None, None)
         };
 
+        // Start P2P node first so the RPC and miner can broadcast through it
+        let (p2p_shutdown_handle, block_broadcast_tx, tx_broadcast_tx) = self.start_p2p().await;
+
         // Create RPC state
         let rpc_state = Arc::new(
             RpcState::new(
@@ -130,7 +133,8 @@ impl Node {
             .with_mine_tx(mine_tx.clone().unwrap_or_else(|| {
                 let (tx, _) = mpsc::channel(1);
                 tx
-            })),
+            }))
+            .with_tx_broadcast(tx_broadcast_tx.clone()),
         );
 
         // Start RPC server
@@ -139,9 +143,6 @@ impl Node {
                 .await?;
 
         tracing::info!("RPC server listening on {}", self.config.rpc_addr);
-
-        // Start P2P node
-        let p2p_shutdown_handle = self.start_p2p().await;
 
         // Start mining task if enabled. Outside devnet (where auto-mine drives
         // requests), the task also polls the mempool so pending transactions
@@ -152,9 +153,10 @@ impl Node {
             let block_store = self.block_store.clone();
             let shutdown_tx = self.shutdown_tx.clone();
             let poll_mempool = !self.config.is_devnet();
+            let block_broadcast = block_broadcast_tx.clone();
 
             Some(tokio::spawn(async move {
-                run_mining_task(chain, mempool, block_store, rx, shutdown_tx, poll_mempool).await;
+                run_mining_task(chain, mempool, block_store, rx, shutdown_tx, poll_mempool, block_broadcast).await;
             }))
         } else {
             None
@@ -188,7 +190,13 @@ impl Node {
     }
 
     /// Start the P2P node in a background task.
-    async fn start_p2p(&self) -> Option<mpsc::Sender<()>> {
+    async fn start_p2p(
+        &self,
+    ) -> (
+        Option<mpsc::Sender<()>>,
+        Option<mpsc::Sender<tunnels_core::block::Block>>,
+        Option<mpsc::Sender<tunnels_core::transaction::SignedTransaction>>,
+    ) {
         // Build P2P config
         let mut p2p_config = P2pConfig::new(self.config.p2p_addr);
 
@@ -203,21 +211,44 @@ impl Node {
             p2p_config.handshake_timeout = std::time::Duration::from_secs(2);
         }
 
-        // Create P2P node
-        let p2p_node = P2pNode::new(
+        // Create P2P node with the full production wiring: state updates for
+        // accurate RPC reporting, plus block and transaction broadcast channels.
+        let mut p2p_node = P2pNode::new(
             p2p_config,
             self.chain.clone(),
             self.mempool.clone(),
         );
 
+        let mut state_rx = p2p_node.state_updates_receiver();
+        let block_submit_tx = p2p_node.block_submit_sender();
+        let tx_submit_tx = p2p_node.tx_submit_sender();
         let shutdown_handle = p2p_node.shutdown_handle();
         let p2p_state = self.p2p_state.clone();
+        let p2p_state_for_updates = self.p2p_state.clone();
 
         // Update P2P state to indicate we're starting
         {
             let mut state = p2p_state.write().await;
             state.set_running(true);
         }
+
+        // Forward P2P state updates to the shared state the RPC reads
+        tokio::spawn(async move {
+            while let Some(update) = state_rx.recv().await {
+                let mut state = p2p_state_for_updates.write().await;
+                state.set_connections(update.outbound_connections, update.inbound_connections);
+                state.set_sync_state(update.syncing, update.synced);
+                let peers: Vec<rpc::PeerSnapshot> = update.peers.into_iter().map(|p| {
+                    rpc::PeerSnapshot {
+                        id: p.id,
+                        addr: p.addr,
+                        direction: p.direction,
+                        best_height: p.best_height,
+                    }
+                }).collect();
+                state.set_peers(peers);
+            }
+        });
 
         // Spawn P2P task
         tokio::spawn(async move {
@@ -237,7 +268,7 @@ impl Node {
 
         tracing::info!("P2P node started on {}", self.config.p2p_addr);
 
-        Some(shutdown_handle)
+        (Some(shutdown_handle), Some(block_submit_tx), Some(tx_submit_tx))
     }
 
     /// Get the chain state (for testing).
@@ -455,6 +486,7 @@ async fn run_mining_task(
     mut rx: mpsc::Receiver<MineRequest>,
     shutdown_tx: ShutdownTx,
     poll_mempool: bool,
+    block_broadcast: Option<mpsc::Sender<tunnels_core::block::Block>>,
 ) {
     let mut shutdown_rx = shutdown_tx.subscribe();
     let mut poll = tokio::time::interval(std::time::Duration::from_secs(2));
@@ -467,13 +499,13 @@ async fn run_mining_task(
                 break;
             }
             Some(request) = rx.recv() => {
-                let hashes = mine_blocks(&chain, &mempool, block_store.as_ref(), request.count).await;
+                let hashes = mine_blocks(&chain, &mempool, block_store.as_ref(), request.count, block_broadcast.as_ref()).await;
                 let _ = request.result_tx.send(hashes);
             }
             _ = poll.tick(), if poll_mempool => {
                 let pending = mempool.read().await.len();
                 if pending > 0 {
-                    let hashes = mine_blocks(&chain, &mempool, block_store.as_ref(), 1).await;
+                    let hashes = mine_blocks(&chain, &mempool, block_store.as_ref(), 1, block_broadcast.as_ref()).await;
                     for hash in &hashes {
                         tracing::info!(block = %hex::encode(hash), pending, "Mined pending transactions");
                     }
@@ -489,6 +521,7 @@ async fn mine_blocks(
     mempool: &Arc<RwLock<Mempool>>,
     block_store: Option<&Arc<BlockStore<RocksBackend>>>,
     count: u64,
+    block_broadcast: Option<&mpsc::Sender<tunnels_core::block::Block>>,
 ) -> Vec<[u8; 32]> {
     let mut hashes = Vec::new();
 
@@ -542,6 +575,11 @@ async fn mine_blocks(
                 tracing::error!("Failed to persist block: {}", e);
                 // Continue anyway - in-memory state is still valid
             }
+        }
+
+        // Announce the new block to connected peers
+        if let Some(broadcast) = block_broadcast {
+            let _ = broadcast.send(block.clone()).await;
         }
 
         // Remove confirmed transactions from mempool

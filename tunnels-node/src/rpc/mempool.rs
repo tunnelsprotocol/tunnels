@@ -60,11 +60,17 @@ pub fn register_methods(module: &mut RpcModule<Arc<RpcState>>) {
 
             drop(chain); // Release read lock before adding
 
+            let broadcast_tx = tx.clone();
             let tx_id = mempool
                 .add_transaction(tx, &mut tip_state, &tip, current_time)
                 .map_err(|e| {
                     ErrorObjectOwned::owned(-32003, format!("Transaction rejected: {}", e), None::<()>)
                 })?;
+
+            // Announce to connected peers (fire-and-forget)
+            if let Some(peer_tx) = &state.tx_broadcast {
+                let _ = peer_tx.send(broadcast_tx).await;
+            }
 
             // If auto-mine is enabled and there's a mine channel, trigger mining
             if state.devnet.as_ref().map(|d| d.auto_mine).unwrap_or(false) {

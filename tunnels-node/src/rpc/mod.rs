@@ -150,6 +150,9 @@ pub struct RpcState {
     /// Channel to request mining.
     pub mine_tx: Option<tokio::sync::mpsc::Sender<MineRequest>>,
 
+    /// Channel to announce locally accepted transactions to peers.
+    pub tx_broadcast: Option<tokio::sync::mpsc::Sender<tunnels_core::transaction::SignedTransaction>>,
+
     /// Shared P2P state.
     pub p2p_state: Option<Arc<RwLock<SharedP2pState>>>,
 }
@@ -176,6 +179,7 @@ impl RpcState {
             mempool,
             devnet,
             mine_tx: None,
+            tx_broadcast: None,
             p2p_state: None,
         }
     }
@@ -183,6 +187,15 @@ impl RpcState {
     /// Set the mining request channel.
     pub fn with_mine_tx(mut self, tx: tokio::sync::mpsc::Sender<MineRequest>) -> Self {
         self.mine_tx = Some(tx);
+        self
+    }
+
+    /// Attach a transaction broadcast channel.
+    pub fn with_tx_broadcast(
+        mut self,
+        tx: Option<tokio::sync::mpsc::Sender<tunnels_core::transaction::SignedTransaction>>,
+    ) -> Self {
+        self.tx_broadcast = tx;
         self
     }
 

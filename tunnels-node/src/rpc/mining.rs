@@ -23,6 +23,15 @@ pub fn register_methods(module: &mut RpcModule<Arc<RpcState>>) {
     // mine - mine N blocks (devnet/testing only)
     module
         .register_async_method("mine", |params, state, _| async move {
+            // Devnet-only: on public networks blocks are produced by the
+            // node's own mining loop, never by RPC callers.
+            if state.devnet.is_none() {
+                return Err(ErrorObjectOwned::owned(
+                    -32601,
+                    "mine is only available in devnet mode",
+                    None::<()>,
+                ));
+            }
             // Parse optional count parameter (default to 1)
             let count: u64 = params.one().unwrap_or(1);
 

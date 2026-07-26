@@ -88,6 +88,8 @@ pub struct P2pNode {
     state_tx: Option<mpsc::Sender<P2pStateUpdate>>,
     /// Channel to receive blocks to broadcast (from external miner).
     block_submit_rx: Option<mpsc::Receiver<Block>>,
+    /// Channel to receive locally accepted transactions to broadcast.
+    tx_submit_rx: Option<mpsc::Receiver<SignedTransaction>>,
     /// Peer contexts for tracking misbehavior.
     peer_contexts: HashMap<PeerId, PeerContext>,
     /// JoinHandles for peer tasks (for graceful shutdown).
@@ -123,6 +125,7 @@ impl P2pNode {
             bound_addr_tx: None,
             state_tx: None,
             block_submit_rx: None,
+            tx_submit_rx: None,
             peer_contexts: HashMap::new(),
             peer_tasks: HashMap::new(),
         }
@@ -149,6 +152,15 @@ impl P2pNode {
     pub fn block_submit_sender(&mut self) -> mpsc::Sender<Block> {
         let (tx, rx) = mpsc::channel(16);
         self.block_submit_rx = Some(rx);
+        tx
+    }
+
+    /// Get a sender for announcing locally accepted transactions to the network.
+    /// Transactions sent through this channel are broadcast to all connected peers
+    /// (the local mempool is assumed to already hold them).
+    pub fn tx_submit_sender(&mut self) -> mpsc::Sender<SignedTransaction> {
+        let (tx, rx) = mpsc::channel(64);
+        self.tx_submit_rx = Some(rx);
         tx
     }
 
@@ -189,6 +201,7 @@ impl P2pNode {
 
         // Take block submit receiver if configured
         let mut block_submit_rx = self.block_submit_rx.take();
+        let mut tx_submit_rx = self.tx_submit_rx.take();
 
         // Intervals
         let mut discovery_timer = interval(DISCOVERY_INTERVAL);
@@ -215,6 +228,16 @@ impl P2pNode {
                     }
                 } => {
                     self.handle_block_submission(block).await;
+                }
+
+                // Handle transaction announcements from the local RPC
+                Some(tx) = async {
+                    match tx_submit_rx.as_mut() {
+                        Some(rx) => rx.recv().await,
+                        None => std::future::pending().await,
+                    }
+                } => {
+                    self.handle_tx_submission(tx).await;
                 }
 
                 // Accept inbound connections
@@ -778,6 +801,15 @@ impl P2pNode {
 
     /// Handle a block submission from an external miner.
     /// Broadcasts the block to all connected peers.
+    /// Broadcast a locally accepted transaction to all peers.
+    async fn handle_tx_submission(&mut self, tx: SignedTransaction) {
+        let tx_id = tx.id();
+        tracing::debug!(tx = ?&tx_id[..8], "Broadcasting locally accepted transaction");
+        self.gossip.mark_tx_seen(tx_id);
+        let message = self.gossip.create_tx_message(tx);
+        self.peers.broadcast(message).await;
+    }
+
     async fn handle_block_submission(&mut self, block: Block) {
         let hash = block.hash();
         let height = block.header.height;

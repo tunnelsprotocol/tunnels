@@ -77,6 +77,10 @@ enum Commands {
         /// Name for the imported key (default: derived from filename).
         #[arg(long)]
         name: Option<String>,
+
+        /// Keep the backup's password; skip the re-encrypt prompt.
+        #[arg(long)]
+        yes: bool,
     },
 
     /// Export the key as an encrypted backup.
@@ -280,7 +284,7 @@ fn run() -> Result<(), String> {
 
     match cli.command {
         Commands::Generate { name } => cmd_generate(&keystore, name),
-        Commands::Import { file, name } => cmd_import(&keystore, file, name),
+        Commands::Import { file, name, yes } => cmd_import(&keystore, file, name, yes),
         Commands::Export { file, name } => cmd_export(&keystore, file, name),
         Commands::Show { name } => cmd_show(&keystore, name),
 
@@ -360,10 +364,16 @@ fn get_key_path(keystore: &Path, name: Option<String>) -> PathBuf {
 }
 
 fn prompt_password(prompt: &str) -> Result<String, String> {
+    if let Ok(pass) = std::env::var("TUNNELS_WALLET_PASSWORD") {
+        return Ok(pass);
+    }
     rpassword::prompt_password(prompt).map_err(|e| format!("Failed to read password: {}", e))
 }
 
 fn prompt_password_confirm() -> Result<String, String> {
+    if let Ok(pass) = std::env::var("TUNNELS_WALLET_PASSWORD") {
+        return Ok(pass);
+    }
     let pass1 = prompt_password("Enter password: ")?;
     let pass2 = prompt_password("Confirm password: ")?;
     if pass1 != pass2 {
@@ -432,7 +442,7 @@ fn cmd_generate(keystore: &Path, name: Option<String>) -> Result<(), String> {
     Ok(())
 }
 
-fn cmd_import(keystore: &Path, file: PathBuf, name: Option<String>) -> Result<(), String> {
+fn cmd_import(keystore: &Path, file: PathBuf, name: Option<String>, assume_keep: bool) -> Result<(), String> {
     fs::create_dir_all(keystore).map_err(|e| format!("Failed to create keystore: {}", e))?;
 
     if !file.exists() {
@@ -460,12 +470,14 @@ fn cmd_import(keystore: &Path, file: PathBuf, name: Option<String>) -> Result<()
     }
 
     // Re-encrypt with potentially new password
-    print!("Re-encrypt with a new password? [y/N] ");
-    io::stdout().flush().ok();
     let mut response = String::new();
-    io::stdin()
-        .read_line(&mut response)
-        .map_err(|e| e.to_string())?;
+    if !assume_keep {
+        print!("Re-encrypt with a new password? [y/N] ");
+        io::stdout().flush().ok();
+        io::stdin()
+            .read_line(&mut response)
+            .map_err(|e| e.to_string())?;
+    }
 
     let final_encrypted = if response.trim().eq_ignore_ascii_case("y") {
         let new_password = prompt_password_confirm()?;
@@ -745,16 +757,11 @@ fn cmd_register_project(
         evidence_hash: None,
     };
 
-    // Derive project ID from transaction hash (before submission)
-    let tx_bytes = serialize(&tx).map_err(|e| e.to_string())?;
-    let project_id_full = sha256(&tx_bytes);
-    let mut project_id = [0u8; 20];
-    project_id.copy_from_slice(&project_id_full[..20]);
-
     let tx_hash = sign_and_submit(node, &kp, &tx)?;
 
     println!("Transaction submitted: {}", tx_hash);
-    println!("Project ID: {}", hex::encode(project_id));
+    // The chain derives the project id from the signed transaction id.
+    println!("Project ID: {}", &tx_hash[..40]);
 
     Ok(())
 }
