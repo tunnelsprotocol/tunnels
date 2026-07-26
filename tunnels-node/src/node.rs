@@ -505,7 +505,7 @@ async fn run_mining_task(
             _ = poll.tick(), if poll_mempool => {
                 let pending = mempool.read().await.len();
                 if pending > 0 {
-                    let hashes = mine_blocks(&chain, &mempool, block_store.as_ref(), 1, block_broadcast.as_ref()).await;
+                    let hashes = mine_blocks_guarded(&chain, &mempool, block_store.as_ref(), block_broadcast.as_ref()).await;
                     for hash in &hashes {
                         tracing::info!(block = %hex::encode(hash), pending, "Mined pending transactions");
                     }
@@ -513,6 +513,42 @@ async fn run_mining_task(
             }
         }
     }
+}
+
+/// Poll-driven mining with a runaway guard: if the mempool has pending
+/// transactions but the produced block would be empty (stale or currently
+/// unmineable transactions), no block is produced. Without this, a single
+/// stuck transaction would trigger an empty block every poll tick, forever.
+async fn mine_blocks_guarded(
+    chain: &Arc<RwLock<ChainState>>,
+    mempool: &Arc<RwLock<Mempool>>,
+    block_store: Option<&Arc<BlockStore<RocksBackend>>>,
+    block_broadcast: Option<&mpsc::Sender<tunnels_core::block::Block>>,
+) -> Vec<[u8; 32]> {
+    let current_time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let would_be_empty = {
+        let chain_read = chain.read().await;
+        let mempool_read = mempool.read().await;
+        match produce_block(&chain_read, &mempool_read, current_time) {
+            Ok(block) => block.transactions.is_empty(),
+            Err(_) => true,
+        }
+    };
+
+    if would_be_empty {
+        let pending = mempool.read().await.len();
+        tracing::warn!(
+            pending,
+            "Mempool has pending transactions but none are currently mineable — skipping block"
+        );
+        return Vec::new();
+    }
+
+    mine_blocks(chain, mempool, block_store, 1, block_broadcast).await
 }
 
 /// Mine the specified number of blocks.
