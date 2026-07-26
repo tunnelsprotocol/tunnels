@@ -118,6 +118,7 @@ mod wasm {
     use tunnels_core::{
         serialization::serialize,
         transaction::{mine_pow, Transaction},
+        types::{ChallengeRuling, RecipientType},
         SignedTransaction, U256,
     };
     use wasm_bindgen::prelude::*;
@@ -260,6 +261,140 @@ mod wasm {
             let attestation_id = hex_to_arr20(attestation_id_hex)?;
             self.with_keypair(|kp| {
                 let tx = Transaction::FinalizeAttestation { attestation_id };
+                build_signed_tx(kp, tx, difficulty)
+            })
+        }
+
+        /// Build, sign, and PoW-mine a RegisterProject transaction.
+        /// The signer becomes the creator of record. All rates in basis points.
+        /// `predecessor_hex` may be empty (no predecessor).
+        #[wasm_bindgen(js_name = buildRegisterProject)]
+        #[allow(clippy::too_many_arguments)]
+        pub fn build_register_project(
+            &self,
+            rho: u32,
+            phi: u32,
+            gamma: u32,
+            delta: u32,
+            phi_recipient_hex: &str,
+            gamma_recipient_hex: &str,
+            gamma_recipient_is_project: bool,
+            reserve_authority_hex: &str,
+            deposit_authority_hex: &str,
+            adjudicator_hex: &str,
+            predecessor_hex: &str,
+            verification_window: u64,
+            attestation_bond: u64,
+            challenge_bond: u64,
+            evidence_hex: &str,
+            difficulty: u64,
+        ) -> Result<String, JsValue> {
+            let phi_recipient = hex_to_arr20(phi_recipient_hex)?;
+            let gamma_recipient = hex_to_arr20(gamma_recipient_hex)?;
+            let reserve_authority = hex_to_arr20(reserve_authority_hex)?;
+            let deposit_authority = hex_to_arr20(deposit_authority_hex)?;
+            let adjudicator = hex_to_arr20(adjudicator_hex)?;
+            let predecessor = if predecessor_hex.is_empty() {
+                None
+            } else {
+                Some(hex_to_arr20(predecessor_hex)?)
+            };
+            // Distinct projects with identical parameters from the same creator
+            // would produce identical (deterministic) transactions and collide;
+            // the evidence hash is the distinguishing field.
+            let evidence_hash = if evidence_hex.is_empty() {
+                None
+            } else {
+                Some(hex_to_arr32(evidence_hex)?)
+            };
+            self.with_keypair(|kp| {
+                let tx = Transaction::RegisterProject {
+                    creator: derive_address(&kp.public_key()),
+                    rho,
+                    phi,
+                    gamma,
+                    delta,
+                    phi_recipient,
+                    gamma_recipient,
+                    gamma_recipient_type: if gamma_recipient_is_project {
+                        RecipientType::Project
+                    } else {
+                        RecipientType::Identity
+                    },
+                    reserve_authority,
+                    deposit_authority,
+                    adjudicator,
+                    predecessor,
+                    verification_window,
+                    attestation_bond,
+                    challenge_bond,
+                    evidence_hash,
+                };
+                build_signed_tx(kp, tx, difficulty)
+            })
+        }
+
+        /// Build, sign, and PoW-mine a ChallengeAttestation transaction.
+        /// `bond_poster_hex` may be empty when the project requires no challenge bond.
+        #[wasm_bindgen(js_name = buildChallengeAttestation)]
+        pub fn build_challenge_attestation(
+            &self,
+            attestation_id_hex: &str,
+            evidence_hex: &str,
+            bond_poster_hex: &str,
+            bond_amount: u64,
+            difficulty: u64,
+        ) -> Result<String, JsValue> {
+            let attestation_id = hex_to_arr20(attestation_id_hex)?;
+            let evidence_hash = hex_to_arr32(evidence_hex)?;
+            let bond_poster = if bond_poster_hex.is_empty() {
+                None
+            } else {
+                Some(hex_to_arr20(bond_poster_hex)?)
+            };
+            self.with_keypair(|kp| {
+                let tx = Transaction::ChallengeAttestation {
+                    attestation_id,
+                    evidence_hash,
+                    bond_poster,
+                    bond_amount: U256::from(bond_amount),
+                };
+                build_signed_tx(kp, tx, difficulty)
+            })
+        }
+
+        /// Build, sign, and PoW-mine a RespondToChallenge transaction
+        /// (signed by the original contributor).
+        #[wasm_bindgen(js_name = buildRespondToChallenge)]
+        pub fn build_respond_to_challenge(
+            &self,
+            challenge_id_hex: &str,
+            evidence_hex: &str,
+            difficulty: u64,
+        ) -> Result<String, JsValue> {
+            let challenge_id = hex_to_arr20(challenge_id_hex)?;
+            let evidence_hash = hex_to_arr32(evidence_hex)?;
+            self.with_keypair(|kp| {
+                let tx = Transaction::RespondToChallenge { challenge_id, evidence_hash };
+                build_signed_tx(kp, tx, difficulty)
+            })
+        }
+
+        /// Build, sign, and PoW-mine a ResolveChallenge transaction
+        /// (signed by the project's adjudicator). `valid` = the attestation stands.
+        #[wasm_bindgen(js_name = buildResolveChallenge)]
+        pub fn build_resolve_challenge(
+            &self,
+            challenge_id_hex: &str,
+            valid: bool,
+            difficulty: u64,
+        ) -> Result<String, JsValue> {
+            let challenge_id = hex_to_arr20(challenge_id_hex)?;
+            self.with_keypair(|kp| {
+                let tx = Transaction::ResolveChallenge {
+                    challenge_id,
+                    ruling: if valid { ChallengeRuling::Valid } else { ChallengeRuling::Invalid },
+                };
                 build_signed_tx(kp, tx, difficulty)
             })
         }
