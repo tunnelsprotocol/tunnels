@@ -72,8 +72,12 @@ pub fn register_methods(module: &mut RpcModule<Arc<RpcState>>) {
                 let _ = peer_tx.send(broadcast_tx).await;
             }
 
-            // If auto-mine is enabled and there's a mine channel, trigger mining
-            if state.devnet.as_ref().map(|d| d.auto_mine).unwrap_or(false) {
+            // Event-driven block production: an accepted transaction triggers
+            // production on any mining node. Blocks package pending work — they
+            // are a consequence of submission, not an independent process.
+            // (Devnet respects --no-auto-mine; the mempool poll remains as a
+            // safety net for transactions that arrive via gossip.)
+            if state.devnet.as_ref().map(|d| d.auto_mine).unwrap_or(true) {
                 if let Some(mine_tx) = &state.mine_tx {
                     let (result_tx, _result_rx) = tokio::sync::oneshot::channel();
                     let _ = mine_tx

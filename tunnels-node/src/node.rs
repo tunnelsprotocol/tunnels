@@ -499,7 +499,13 @@ async fn run_mining_task(
                 break;
             }
             Some(request) = rx.recv() => {
-                let hashes = mine_blocks(&chain, &mempool, block_store.as_ref(), request.count, block_broadcast.as_ref()).await;
+                // Outside devnet, requests come from transaction acceptance —
+                // apply the same never-mine-empty guard as the poll path.
+                let hashes = if poll_mempool {
+                    mine_blocks_guarded(&chain, &mempool, block_store.as_ref(), block_broadcast.as_ref()).await
+                } else {
+                    mine_blocks(&chain, &mempool, block_store.as_ref(), request.count, block_broadcast.as_ref()).await
+                };
                 let _ = request.result_tx.send(hashes);
             }
             _ = poll.tick(), if poll_mempool => {
