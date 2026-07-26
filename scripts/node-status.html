@@ -168,7 +168,8 @@
 
                 setText('block-height', blockCount.toLocaleString());
                 setText('best-hash', bestHash || '(genesis)');
-                setText('peer-count', nodeInfo.peer_count != null ? nodeInfo.peer_count : '--');
+                const peers = nodeInfo.connections != null ? nodeInfo.connections : nodeInfo.peer_count;
+                setText('peer-count', peers != null ? peers : '--');
                 setText('node-version', nodeInfo.version || '--');
                 setText('network', nodeInfo.network || 'testnet');
                 setText('mempool-size', mempoolInfo.size != null ? mempoolInfo.size : '--');
