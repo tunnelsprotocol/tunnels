@@ -143,15 +143,18 @@ impl Node {
         // Start P2P node
         let p2p_shutdown_handle = self.start_p2p().await;
 
-        // Start mining task if enabled
+        // Start mining task if enabled. Outside devnet (where auto-mine drives
+        // requests), the task also polls the mempool so pending transactions
+        // are mined without an external trigger.
         let mining_handle = if let Some(rx) = mine_rx {
             let chain = self.chain.clone();
             let mempool = self.mempool.clone();
             let block_store = self.block_store.clone();
             let shutdown_tx = self.shutdown_tx.clone();
+            let poll_mempool = !self.config.is_devnet();
 
             Some(tokio::spawn(async move {
-                run_mining_task(chain, mempool, block_store, rx, shutdown_tx).await;
+                run_mining_task(chain, mempool, block_store, rx, shutdown_tx, poll_mempool).await;
             }))
         } else {
             None
@@ -440,14 +443,22 @@ fn load_chain_from_storage(
 }
 
 /// Run the mining task.
+///
+/// Always serves explicit `MineRequest`s (the `mine` RPC, devnet auto-mine).
+/// With `poll_mempool` set (mainnet `--mine`), it additionally checks the
+/// mempool on an interval and mines pending transactions unprompted — blocks
+/// are only produced when there is work, never on an empty mempool.
 async fn run_mining_task(
     chain: Arc<RwLock<ChainState>>,
     mempool: Arc<RwLock<Mempool>>,
     block_store: Option<Arc<BlockStore<RocksBackend>>>,
     mut rx: mpsc::Receiver<MineRequest>,
     shutdown_tx: ShutdownTx,
+    poll_mempool: bool,
 ) {
     let mut shutdown_rx = shutdown_tx.subscribe();
+    let mut poll = tokio::time::interval(std::time::Duration::from_secs(2));
+    poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
     loop {
         tokio::select! {
@@ -458,6 +469,15 @@ async fn run_mining_task(
             Some(request) = rx.recv() => {
                 let hashes = mine_blocks(&chain, &mempool, block_store.as_ref(), request.count).await;
                 let _ = request.result_tx.send(hashes);
+            }
+            _ = poll.tick(), if poll_mempool => {
+                let pending = mempool.read().await.len();
+                if pending > 0 {
+                    let hashes = mine_blocks(&chain, &mempool, block_store.as_ref(), 1).await;
+                    for hash in &hashes {
+                        tracing::info!(block = %hex::encode(hash), pending, "Mined pending transactions");
+                    }
+                }
             }
         }
     }
