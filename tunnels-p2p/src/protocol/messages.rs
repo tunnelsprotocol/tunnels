@@ -24,6 +24,8 @@ pub struct VersionMessage {
     pub timestamp: u64,
     /// The sender's listening address (if any).
     pub listen_addr: Option<SocketAddr>,
+    /// Sender's random session nonce — lets a node detect a connection to itself.
+    pub nonce: u64,
 }
 
 /// Request for block headers starting from known hashes.

@@ -75,6 +75,20 @@ pub struct P2pConfig {
 
     /// Initial peers to connect to (bootstrap nodes).
     pub bootstrap_peers: Vec<SocketAddr>,
+
+    /// Random per-session nonce sent in version messages. A node that receives
+    /// its own nonce back is talking to itself and drops the connection.
+    pub session_nonce: u64,
+}
+
+/// Not cryptographic — only has to differ between two processes so a node can
+/// recognize its own version message.
+fn generate_session_nonce() -> u64 {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0);
+    nanos ^ ((std::process::id() as u64) << 32)
 }
 
 impl Default for P2pConfig {
@@ -92,6 +106,7 @@ impl Default for P2pConfig {
             peers_file: PathBuf::from("peers.json"),
             user_agent: DEFAULT_USER_AGENT.to_string(),
             bootstrap_peers: Vec::new(),
+            session_nonce: generate_session_nonce(),
         }
     }
 }

@@ -43,6 +43,10 @@ pub enum P2pError {
     #[error("Genesis mismatch: expected {expected}, got {actual}")]
     GenesisMismatch { expected: String, actual: String },
 
+    /// The peer echoed our own session nonce — we connected to ourselves.
+    #[error("Self connection detected")]
+    SelfConnection,
+
     /// Protocol version incompatible.
     #[error("Incompatible protocol version: {peer_version} (our version: {our_version})")]
     IncompatibleVersion { peer_version: u32, our_version: u32 },

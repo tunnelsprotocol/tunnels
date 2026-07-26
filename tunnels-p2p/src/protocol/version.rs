@@ -19,6 +19,7 @@ pub fn create_version_message(
     best_hash: [u8; 32],
     user_agent: &str,
     listen_addr: Option<SocketAddr>,
+    nonce: u64,
 ) -> VersionMessage {
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -33,6 +34,7 @@ pub fn create_version_message(
         user_agent: user_agent.to_string(),
         timestamp,
         listen_addr,
+        nonce,
     }
 }
 
@@ -41,10 +43,17 @@ pub fn create_version_message(
 /// Checks:
 /// - Protocol version is compatible
 /// - Genesis hash matches
+/// - The nonce is not our own (self-connection guard)
 pub fn validate_version(
     received: &VersionMessage,
     our_genesis_hash: [u8; 32],
+    our_nonce: u64,
 ) -> P2pResult<()> {
+    // A peer echoing our session nonce is this node talking to itself —
+    // typically after learning its own advertised address from gossip.
+    if received.nonce == our_nonce {
+        return Err(P2pError::SelfConnection);
+    }
     // Check protocol version compatibility
     // For now, require exact match; later could allow compatible ranges
     if received.protocol_version != PROTOCOL_VERSION {
@@ -143,9 +152,10 @@ impl HandshakeState {
         &mut self,
         msg: VersionMessage,
         our_genesis_hash: [u8; 32],
+        our_nonce: u64,
     ) -> P2pResult<()> {
         // Validate the version
-        validate_version(&msg, our_genesis_hash)?;
+        validate_version(&msg, our_genesis_hash, our_nonce)?;
 
         match self {
             Self::Initial => {
@@ -208,6 +218,7 @@ impl HandshakeState {
         best_hash: [u8; 32],
         user_agent: &str,
         listen_addr: Option<SocketAddr>,
+        nonce: u64,
     ) -> Option<Message> {
         match self {
             Self::Initial => Some(Message::Version(create_version_message(
@@ -216,6 +227,7 @@ impl HandshakeState {
                 best_hash,
                 user_agent,
                 listen_addr,
+                nonce,
             ))),
             Self::VersionReceived(_) => Some(Message::Version(create_version_message(
                 genesis_hash,
@@ -223,6 +235,7 @@ impl HandshakeState {
                 best_hash,
                 user_agent,
                 listen_addr,
+                nonce,
             ))),
             Self::VersionSent => None, // Wait for peer's version
             Self::AwaitingAck(_) => Some(Message::VersionAck),
@@ -246,6 +259,9 @@ mod tests {
         [0u8; 32]
     }
 
+    const OUR_NONCE: u64 = 42;
+    const PEER_NONCE: u64 = 7;
+
     fn test_version() -> VersionMessage {
         create_version_message(
             test_genesis_hash(),
@@ -253,21 +269,30 @@ mod tests {
             [1u8; 32],
             "test/1.0",
             None,
+            PEER_NONCE,
         )
     }
 
     #[test]
     fn test_validate_version_success() {
         let msg = test_version();
-        assert!(validate_version(&msg, test_genesis_hash()).is_ok());
+        assert!(validate_version(&msg, test_genesis_hash(), OUR_NONCE).is_ok());
     }
 
     #[test]
     fn test_validate_version_genesis_mismatch() {
         let msg = test_version();
         let different_genesis = [1u8; 32];
-        let result = validate_version(&msg, different_genesis);
+        let result = validate_version(&msg, different_genesis, OUR_NONCE);
         assert!(matches!(result, Err(P2pError::GenesisMismatch { .. })));
+    }
+
+    #[test]
+    fn test_validate_version_self_connection() {
+        // A version message carrying our own nonce means we dialed ourselves.
+        let msg = test_version();
+        let result = validate_version(&msg, test_genesis_hash(), PEER_NONCE);
+        assert!(matches!(result, Err(P2pError::SelfConnection)));
     }
 
     #[test]
@@ -280,7 +305,7 @@ mod tests {
         assert!(matches!(state, HandshakeState::VersionSent));
 
         // Receive peer's version
-        state.received_version(test_version(), test_genesis_hash()).unwrap();
+        state.received_version(test_version(), test_genesis_hash(), OUR_NONCE).unwrap();
         assert!(matches!(state, HandshakeState::AwaitingAck(_)));
 
         // Send verack
@@ -297,7 +322,7 @@ mod tests {
         let mut state = HandshakeState::new();
 
         // Receive peer's version first
-        state.received_version(test_version(), test_genesis_hash()).unwrap();
+        state.received_version(test_version(), test_genesis_hash(), OUR_NONCE).unwrap();
         assert!(matches!(state, HandshakeState::VersionReceived(_)));
 
         // Send our version

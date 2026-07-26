@@ -213,6 +213,7 @@ impl PeerConnection {
                 self.best_hash,
                 &self.config.user_agent,
                 Some(self.config.bind_addr),
+                self.config.session_nonce,
             );
             self.send_message(Message::Version(version)).await?;
             handshake.sent_version()?;
@@ -233,7 +234,7 @@ impl PeerConnection {
 
             match message {
                 Message::Version(version) => {
-                    handshake.received_version(version.clone(), self.genesis_hash)?;
+                    handshake.received_version(version.clone(), self.genesis_hash, self.config.session_nonce)?;
 
                     // Update peer info
                     self.info.best_height = version.best_height;
@@ -247,6 +248,7 @@ impl PeerConnection {
                             self.best_hash,
                             &self.config.user_agent,
                             Some(self.config.bind_addr),
+                            self.config.session_nonce,
                         );
                         self.send_message(Message::Version(our_version)).await?;
                         handshake.sent_version()?;

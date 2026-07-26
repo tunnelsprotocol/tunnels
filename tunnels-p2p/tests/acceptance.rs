@@ -671,6 +671,7 @@ async fn test_message_framing_roundtrip() {
         user_agent: "test/1.0".to_string(),
         timestamp: 12345,
         listen_addr: Some("127.0.0.1:8333".parse().unwrap()),
+        nonce: 7,
     };
 
     let original = Message::Version(version);
